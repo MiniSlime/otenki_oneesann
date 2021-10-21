@@ -15,6 +15,10 @@ class MyApp extends StatelessWidget{
 }
 
 class OtenkiState extends State<Otenki>{
+  pushButton(){
+
+  }
+
   @override
   Widget build(BuildContext context){
     return Scaffold(
@@ -25,6 +29,11 @@ class OtenkiState extends State<Otenki>{
       ),
       body: Center(
 
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.cloud),
+        onPressed: pushButton,
+        backgroundColor: Colors.cyan,
       ),
     );
   }
