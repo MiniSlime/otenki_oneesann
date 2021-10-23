@@ -3,6 +3,7 @@ import 'package:english_words/english_words.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:gpt_3_dart/gpt_3_dart.dart';
 
 var serverURL = "https://api.openweathermap.org/data/2.5/find?";
 var apiKey = "f797e7d91765dd336ae257abd4338dd0";
@@ -24,6 +25,7 @@ class OtenkiState extends State<Otenki>{
   String _location = "no data";
   String _latitude = "";
   String _longitude = "";
+  String _script = "no script";
   bool _gotWeather = false;
   WeatherData wData;
 
@@ -47,6 +49,28 @@ class OtenkiState extends State<Otenki>{
       wData = data.data;
       _gotWeather = true;
     });
+
+    String description = wData.weather.description;
+    String city = wData.name;
+    String country = wData.country;
+    String temp = wData.main.temp.toStringAsFixed(1);
+    String tempMax = wData.main.tempMax.toStringAsFixed(1);
+    String tempMin = wData.main.tempMin.toStringAsFixed(1);
+    DateTime now = DateTime.now();
+    String month = now.month.toString();
+    String day = now.day.toString();
+
+    String prompt = "This is the weather forecast for ${city} City, ${country}. The weather for today, ${month}/${day}, is forecast to be ${description}, with a current temperature of ${temp} degrees Celsius, a high of ${tempMax} degrees Celsius, and a low of ${tempMin} degrees Celsius. A polite announcer will explains this to us.\nAnnouncer:";
+    print(prompt);
+    getGpt3Response(prompt);
+  }
+
+  getGpt3Response(String prompt) async{
+    OpenAI openAI = new OpenAI(apiKey: "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");
+    String complete = await openAI.complete(prompt, 100, temperature: 0.75, n: 10);
+    setState(() {
+      _script = complete;
+    });
   }
 
   pushButton(){
@@ -55,7 +79,13 @@ class OtenkiState extends State<Otenki>{
 
   @override
   Widget build(BuildContext context){
+    final double deviceHeight = MediaQuery.of(context).size.height;
+    final double deviceWidth = MediaQuery.of(context).size.width;
+    final double fontSize = 18;
+    final TextStyle style = TextStyle(fontSize: fontSize);
+
     return Scaffold(
+      backgroundColor: Colors.cyan.shade50,
       appBar: AppBar(
         backgroundColor: Colors.cyan,
         centerTitle: true,
@@ -63,11 +93,30 @@ class OtenkiState extends State<Otenki>{
       ),
       body: Center(
         child: Column(
-          children: <Widget>[
-            Text(_location),
-            Text(_gotWeather ? wData.weather.description : "no data"),
-            Text(_gotWeather ? wData.name : "no data"),
-            Text(_gotWeather ? wData.country : "no data"),
+          children: [
+            Container(
+              height: 15,
+            ),
+            SizedBox(
+              width: deviceWidth * 0.9,
+              child: Card(
+                color: Colors.cyan.shade100,
+                elevation: 20,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 15),
+                  child: Column(
+                    children: <Widget>[
+                      Text(_location, style: style),
+                      Text(_gotWeather ? wData.main.temp.toStringAsFixed(1) : "no data", style: style),
+                      Text(_gotWeather ? wData.weather.description : "no data", style: style),
+                      Text(_gotWeather ? wData.name : "no data", style: style),
+                      Text(_gotWeather ? wData.country : "no data", style: style),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Text(_script),
           ],
         ),
       ),
