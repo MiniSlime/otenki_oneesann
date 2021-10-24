@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:english_words/english_words.dart';
+// import 'package:english_words/english_words.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:gpt_3_dart/gpt_3_dart.dart';
+import 'dart:convert' as convert;
 
 var serverURL = "https://api.openweathermap.org/data/2.5/find?";
-var apiKey = "f797e7d91765dd336ae257abd4338dd0";
+var apiKeyWeather = "f797e7d91765dd336ae257abd4338dd0";
+var apiKeyGPT3 = "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";
 
 void main() => runApp(MyApp());
 
@@ -36,7 +38,7 @@ class OtenkiState extends State<Otenki>{
       _latitude = position.latitude.toString();
       _longitude = position.longitude.toString();
     });
-    String url=serverURL + "lat=" + _latitude + "&lon=" + _longitude + "&appid=" + apiKey + "&cnt=1&lang=en";
+    String url = serverURL + "lat=" + _latitude + "&lon=" + _longitude + "&appid=" + apiKeyWeather + "&cnt=1&lang=en";
     getWeather(url);
   }
 
@@ -50,6 +52,30 @@ class OtenkiState extends State<Otenki>{
       _gotWeather = true;
     });
 
+    String url2 = "https://api.openweathermap.org/data/2.5/onecall?lat=${_latitude}&lon=${_longitude}&exclude=current,minutely,daily,alerts&units=metric&appid=$apiKeyWeather";
+    Uri _uri2 = Uri.parse(url2);
+    final response2 = await http.get(_uri2);
+    Map<String, dynamic> res;
+    if(response2.statusCode == 200){
+      var jsonResponse =
+          convert.jsonDecode(response2.body) as Map<String, dynamic>;
+      res = jsonResponse;
+    }else{
+      print('Request failed with status: ${response2.statusCode}.');
+    }
+
+    List<String> futureWeather = [];
+    for(int i=0;i<24;i++){
+      Map<String, dynamic> forecast = res['hourly'][i];
+      String forecastPrompt = "${i + 1}hour(s) later, ";
+      forecastPrompt += "weather is ${forecast['weather'][0]['main']}, \n";
+      forecastPrompt += "temperature is ${forecast['temp']} degrees Celsius, ";
+      forecastPrompt += "humidity is ${forecast['humidity']}%, ";
+      forecastPrompt += "wind speed is ${forecast['wind_speed']}m/s.\n";
+
+      futureWeather.add(forecastPrompt);
+    }
+
     String description = wData.weather.description;
     String city = wData.name;
     String country = wData.country;
@@ -59,18 +85,49 @@ class OtenkiState extends State<Otenki>{
     DateTime now = DateTime.now();
     String month = now.month.toString();
     String day = now.day.toString();
+    String hour = now.hour.toString();
+    String minute = now.minute.toString();
 
-    String prompt = "This is the weather forecast for ${city} City, ${country}. The weather for today, ${month}/${day}, is forecast to be ${description}, with a current temperature of ${temp} degrees Celsius, a high of ${tempMax} degrees Celsius, and a low of ${tempMin} degrees Celsius. A polite announcer will explains this to us.\nAnnouncer:";
+    String prompt = "Information: Here is the weather forecast for ${city} City, ${country} at ${hour}:${minute} on ${month}/${day}. Today's weather is ${description}, with a current temperature of ${temp} degrees Celsius, a high of ${tempMax} degrees Celsius, and a low of ${tempMin} degrees Celsius.\n";
+    prompt += "\nIn addition, the forecast for weather, temperature, humidity and wind speed for the next 24 hours is as follows\n\n";
+
+    for(int i=3;i<24;i+=4){
+      prompt += futureWeather[i];
+    }
+
+    prompt += "\nBased on this information, a cheerful announcer will give you a weather forecast.\n\nAnnouncer:";
+    setState(() {
+      _script = prompt;
+    });
     print(prompt);
     getGpt3Response(prompt);
   }
 
   getGpt3Response(String prompt) async{
-    OpenAI openAI = new OpenAI(apiKey: "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");
-    String complete = await openAI.complete(prompt, 100, temperature: 0.75, n: 10);
+    OpenAI openAI = new OpenAI(apiKey: apiKeyGPT3);
+    String complete = await openAI.complete(prompt, 100, temperature: 0.8);
     setState(() {
       _script = complete;
     });
+
+    translation(_script);
+  }
+
+  translation(String script) async{
+    String url = "https://script.google.com/macros/s/AKfycbzeAEgBUSKw2jwwG4SBdWI50xBlscJO80KVQKc7axxd5EzsLnI/exec?text=" + script + "&source=en&target=ja";
+    Uri _uri = Uri.parse(url);
+    var response = await http.get(_uri);
+    if(response.statusCode == 200){
+      var jsonResponse = convert.jsonDecode(response.body) as Map<String, dynamic>;
+      String text = jsonResponse['text'];
+      setState(() {
+        _script = text;
+      });
+    }else{
+      setState(() {
+        _script = "翻訳エラーが発生しました";
+      });
+    }
   }
 
   pushButton(){
@@ -79,7 +136,7 @@ class OtenkiState extends State<Otenki>{
 
   @override
   Widget build(BuildContext context){
-    final double deviceHeight = MediaQuery.of(context).size.height;
+    // final double deviceHeight = MediaQuery.of(context).size.height;
     final double deviceWidth = MediaQuery.of(context).size.width;
     final double fontSize = 18;
     final TextStyle style = TextStyle(fontSize: fontSize);
@@ -107,10 +164,11 @@ class OtenkiState extends State<Otenki>{
                   child: Column(
                     children: <Widget>[
                       Text(_location, style: style),
-                      Text(_gotWeather ? wData.main.temp.toStringAsFixed(1) : "no data", style: style),
-                      Text(_gotWeather ? wData.weather.description : "no data", style: style),
-                      Text(_gotWeather ? wData.name : "no data", style: style),
-                      Text(_gotWeather ? wData.country : "no data", style: style),
+                      Text("Temp：" + (_gotWeather ? wData.main.temp.toStringAsFixed(1) : "no data"), style: style),
+                      Text("TempMax：" + (_gotWeather ? wData.main.tempMax.toStringAsFixed(1) : "no data"), style: style),
+                      Text("TempMin：" + (_gotWeather ? wData.main.tempMin.toStringAsFixed(1) : "no data"), style: style),
+                      Text("Weather：" + (_gotWeather ? wData.weather.description : "no data"), style: style),
+                      Text("Location：" + (_gotWeather ? wData.name + ", " + wData.country : "no data"), style: style),
                     ],
                   ),
                 ),
