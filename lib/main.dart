@@ -7,8 +7,8 @@ import 'package:gpt_3_dart/gpt_3_dart.dart';
 import 'dart:convert' as convert;
 
 var serverURL = "https://api.openweathermap.org/data/2.5/find?";
-var apiKeyWeather = "f797e7d91765dd336ae257abd4338dd0";
-var apiKeyGPT3 = "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";
+var apiKeyWeather = "secret";
+var apiKeyGPT3 = "secret";
 
 void main() => runApp(MyApp());
 
